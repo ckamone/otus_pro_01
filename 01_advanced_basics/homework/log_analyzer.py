@@ -45,9 +45,11 @@ if config.get('LOG_FILE', False):
     logger.addHandler(file_handler)
 
 
+def check_format(a):
+    return True if re.findall(r'[\.0-9][g0-9][z0-9]$',a) else False
+
+
 # функция которая ищет последний лог удобно возвращать namedtuple
-#протестируйте фунĸцию поисĸа лога, она не должна возвращать .bz2 файлы и
-#т.п. Этого можно добиться правильной регулярĸой.
 def get_last_logfile(mypath):
     f = []
     for (dirpath, dirnames, filenames) in os.walk(mypath):
@@ -58,6 +60,9 @@ def get_last_logfile(mypath):
     if len(f):
         f.sort()
         last_log_name = f[-1]
+        if not check_format(last_log_name):
+            logger.error(f'Only support plain text or .gz files')
+            return None
         Logfile = namedtuple("Logfile", 'path name date is_gz')
         date = re.findall(r'\d*\.\d+|\d+', last_log_name)
         date_obj = datetime.strptime(date[0], '%Y%m%d')
@@ -183,7 +188,7 @@ def run(config):
                 logger.info(f'rendering report')
                 render_report(stats, rep_name)
         else:
-            logger.error('no log files')
+            logger.error('no log files to analyze')
         logger.info('script done')
     except (Exception, KeyboardInterrupt) as e:
         logger.exception(f'{e}')
