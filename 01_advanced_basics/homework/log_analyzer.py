@@ -15,15 +15,34 @@ from datetime import datetime
 from statistics import median
 import argparse
 import json
+import logging
 
 config = {
     "REPORT_SIZE": 1000,
     "REPORT_DIR": "./reports",
-    "LOG_DIR": "./log"
+    "LOG_DIR": "./log",
+    "LOG_FILE": "scr.log"
 }
 
+FORMAT = '[%(asctime)s] %(levelname).1s %(message)s'
+DATEFORMAT = '%Y.%m.%d %H:%M:%S'
 
+formatter = logging.Formatter(fmt=FORMAT, datefmt=DATEFORMAT)
 
+stream_handler = logging.StreamHandler()
+stream_handler.setLevel(logging.INFO)
+stream_handler.setFormatter(formatter)
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+logger.addHandler(stream_handler)
+
+if config.get('LOG_FILE', False):
+    logging.basicConfig(filename=config['LOG_FILE'])
+    file_handler = logging.FileHandler(config['LOG_FILE'])
+    file_handler.setLevel(logging.INFO)
+    file_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
 
 
 # функция которая ищет последний лог удобно возвращать namedtuple
@@ -52,7 +71,10 @@ def parser(gen):
         'total_count':0,
         'total_request_time':0
         }
+    total_entries = 0
+    errors = 0
     for i in gen:
+        total_entries+=1
         url = re.findall(r'\w+\s[/][^\s]+',i)
         if len(url) != 0:
             url = url[0].split(' ')[1]
@@ -65,7 +87,11 @@ def parser(gen):
                 temp[url].append(float(i.split(' ')[-1]))
                 temp['total_count']+=1
                 temp['total_request_time']+=req_time
-    return temp
+        else:
+            errors+=1
+    err_perc = errors/total_entries*100
+    logger.info(f'Ошибок при парсинге {errors}, всего записей {total_entries}.')
+    return temp, err_perc
 
 
 def genf(file_content):
@@ -95,32 +121,49 @@ def counter(d: dict, limit):
 
 #функция создатель отчета
 def render_report(stats, path, file_date):
-    with open('report.html', 'r') as f:
-        text = f.read()
+    try:
+        with open('report.html', 'r') as f:
+            text = f.read()
 
-    text = text.replace('$table_json', str(stats))
-    rep_name = os.path.join(path, f'report-{file_date.strftime("%Y.%m.%d")}.html')
-    with open(rep_name, 'w') as f:
-        f.write(text)
-
+        text = text.replace('$table_json', str(stats))
+        rep_name = os.path.join(path, f'report-{file_date.strftime("%Y.%m.%d")}.html')
+        with open(rep_name, 'w') as f:
+            f.write(text)
+    except (FileNotFoundError, json.decoder.JSONDecodeError) as e:
+        logger.error(f'{e}')
+        raise
 
 def run(config):
-    last_logfile = get_last_logfile(config['LOG_DIR'])
-    if last_logfile is not None:
-        path = os.path.join(last_logfile.path, last_logfile.name)
-        read_cmd = "gzip.open(path, 'rb')" if last_logfile.is_gz else "open(path, 'rb')" # тернарный оператор
-        with eval(read_cmd) as f:
-            lfile = f.read()
-        generator = genf(lfile)
-        parse_data = parser(generator)
-        stats = counter(parse_data, config['REPORT_SIZE'])
-        render_report(stats, config['REPORT_DIR'], last_logfile.date)
-
-    else:
-        pass # TODO logging that no files
+    try:
+        logger.info('start work with logs')
+        last_logfile = get_last_logfile(config['LOG_DIR'])
+        if last_logfile is not None:
+            logger.info(f'working with {last_logfile.name}')
+            path = os.path.join(last_logfile.path, last_logfile.name)
+            read_cmd = "gzip.open(path, 'rb')" if last_logfile.is_gz else "open(path, 'rb')" # тернарный оператор
+            logger.info(f'reading logfile')
+            with eval(read_cmd) as f:
+                lfile = f.read()
+            generator = genf(lfile)
+            logger.info(f'parsing logfile')
+            parse_data, err_perc = parser(generator)
+            logger.info(f'Не удалось распарсить {round(err_perc,2)}% логов')
+            if err_perc > 30:
+                logger.error(f'Превышен 30% допустимых ошибок при парсинге.')
+            logger.info(f'counting stats')
+            stats = counter(parse_data, config['REPORT_SIZE'])
+            logger.info(f'rendering report')
+            render_report(stats, config['REPORT_DIR'], last_logfile.date)
+        else:
+            logger.error('no log files')
+        logger.info('done')
+    except (Exception, KeyboardInterrupt) as e:
+        logger.exception(f'{e}')
+        raise
 
 
 def main(config):
+    logger.info('start script')
 
     parser = argparse.ArgumentParser()
 
@@ -131,10 +174,17 @@ def main(config):
     args = parser.parse_args()
     if args.config is not config:
         try:
+            logger.info(f'using {args.config} as cfg file')
             with open(args.config, 'r') as f:
                 config = json.loads(f.read())
-        except (FileNotFoundError, json.decoder.JSONDecodeError):
+        except (FileNotFoundError, json.decoder.JSONDecodeError) as e:
+            logger.error(f'{e}')
             raise
+        except Exception as e:
+            logger.exception(f'{e}')
+            raise
+    else:
+        logger.info('using default cfg')
     run(config)
 
 
