@@ -46,6 +46,8 @@ if config.get('LOG_FILE', False):
 
 
 # функция которая ищет последний лог удобно возвращать namedtuple
+#протестируйте фунĸцию поисĸа лога, она не должна возвращать .bz2 файлы и
+#т.п. Этого можно добиться правильной регулярĸой.
 def get_last_logfile(mypath):
     f = []
     for (dirpath, dirnames, filenames) in os.walk(mypath):
@@ -120,13 +122,13 @@ def counter(d: dict, limit):
 
 
 # функция создатель отчета
-def render_report(stats, path, file_date):
+def render_report(stats, rep_name):
     try:
         with open('report.html', 'r') as f:
             text = f.read()
 
         text = text.replace('$table_json', str(stats))
-        rep_name = os.path.join(path, f'report-{file_date.strftime("%Y.%m.%d")}.html')
+        # rep_name = os.path.join(path, f'report-{file_date.strftime("%Y.%m.%d")}.html')
         with open(rep_name, 'w') as f:
             f.write(text)
     except (FileNotFoundError, json.decoder.JSONDecodeError) as e:
@@ -140,6 +142,17 @@ def checkin_dir(directory):
             f"Нужна директория: mkdir {directory}")
 
 
+# функция проверяет что скрипт не отрабатывал с этим лог файлом
+def check_repeat(rep, repdir):
+    f = []
+    for (dirpath, dirnames, filenames) in os.walk(repdir):
+        f = filenames
+        break
+    return True if rep in f else False
+    
+
+
+
 def run(config):
     try:
         checkin_dir(config['LOG_DIR'])
@@ -147,25 +160,31 @@ def run(config):
         logger.info('start work with logs')
         last_logfile = get_last_logfile(config['LOG_DIR'])
         if last_logfile is not None:
-            logger.info(f'working with {last_logfile.name}')
-            path = os.path.join(last_logfile.path, last_logfile.name)
-            read_cmd = "gzip.open(path, 'rb')" if last_logfile.is_gz else "open(path, 'rb')"  # тернарный оператор
-            logger.info(f'reading logfile')
-            with eval(read_cmd) as f:
-                lfile = f.read()
-            generator = genf(lfile)
-            logger.info(f'parsing logfile')
-            parse_data, err_perc = parser(generator)
-            logger.info(f'Не удалось распарсить {round(err_perc, 2)}% логов')
-            if err_perc > 30:
-                logger.error(f'Превышен 30% допустимых ошибок при парсинге.')
-            logger.info(f'counting stats')
-            stats = counter(parse_data, config['REPORT_SIZE'])
-            logger.info(f'rendering report')
-            render_report(stats, config['REPORT_DIR'], last_logfile.date)
+            rep_name = f'report-{last_logfile.date.strftime("%Y.%m.%d")}.html'
+            if check_repeat(rep_name, config['REPORT_DIR']):
+                logger.info('report done already')
+            else:
+                rep_name = os.path.join(config['REPORT_DIR'], rep_name)
+
+                logger.info(f'working with {last_logfile.name}')
+                path = os.path.join(last_logfile.path, last_logfile.name)
+                read_cmd = "gzip.open(path, 'rb')" if last_logfile.is_gz else "open(path, 'rb')"  # тернарный оператор
+                logger.info(f'reading logfile')
+                with eval(read_cmd) as f:
+                    lfile = f.read()
+                generator = genf(lfile)
+                logger.info(f'parsing logfile')
+                parse_data, err_perc = parser(generator)
+                logger.info(f'Не удалось распарсить {round(err_perc, 2)}% логов')
+                if err_perc > 30:
+                    logger.error(f'Превышен 30% допустимых ошибок при парсинге.')
+                logger.info(f'counting stats')
+                stats = counter(parse_data, config['REPORT_SIZE'])
+                logger.info(f'rendering report')
+                render_report(stats, rep_name)
         else:
             logger.error('no log files')
-        logger.info('done')
+        logger.info('script done')
     except (Exception, KeyboardInterrupt) as e:
         logger.exception(f'{e}')
         raise
