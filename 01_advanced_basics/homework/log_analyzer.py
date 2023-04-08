@@ -7,15 +7,14 @@
 #                     '"$http_user_agent" "$http_x_forwarded_for" "$http_X_REQUEST_ID" "$http_X_RB_USER" '  
 #                     '$request_time';
 
-import gzip
-import os
-from collections import namedtuple
-import re
-from datetime import datetime
-from statistics import median
 import argparse
 import json
 import logging
+import os
+import re
+from collections import namedtuple
+from datetime import datetime
+from statistics import median
 
 config = {
     "REPORT_SIZE": 1000,
@@ -56,8 +55,8 @@ def get_last_logfile(mypath):
     if len(f):
         f.sort()
         last_log_name = f[-1]
-        Logfile = namedtuple("Logfile",'path name date is_gz')
-        date = re.findall(r'\d*\.\d+|\d+',last_log_name)
+        Logfile = namedtuple("Logfile", 'path name date is_gz')
+        date = re.findall(r'\d*\.\d+|\d+', last_log_name)
         date_obj = datetime.strptime(date[0], '%Y%m%d')
         last_log_obj = Logfile(mypath, last_log_name, date_obj, '.gz' in last_log_name)
         return last_log_obj
@@ -68,28 +67,28 @@ def get_last_logfile(mypath):
 # функция парсер лога 
 def parser(gen):
     temp = {
-        'total_count':0,
-        'total_request_time':0
-        }
+        'total_count': 0,
+        'total_request_time': 0
+    }
     total_entries = 0
     errors = 0
     for i in gen:
-        total_entries+=1
-        url = re.findall(r'\w+\s[/][^\s]+',i)
+        total_entries += 1
+        url = re.findall(r'\w+\s[/][^\s]+', i)
         if len(url) != 0:
             url = url[0].split(' ')[1]
             req_time = float(i.split(' ')[-1])
             if not temp.get(url):
-                temp[url]=[req_time]
-                temp['total_count']+=1
-                temp['total_request_time']+=req_time
+                temp[url] = [req_time]
+                temp['total_count'] += 1
+                temp['total_request_time'] += req_time
             else:
                 temp[url].append(float(i.split(' ')[-1]))
-                temp['total_count']+=1
-                temp['total_request_time']+=req_time
+                temp['total_count'] += 1
+                temp['total_request_time'] += req_time
         else:
-            errors+=1
-    err_perc = errors/total_entries*100
+            errors += 1
+    err_perc = errors / total_entries * 100
     logger.info(f'Ошибок при парсинге {errors}, всего записей {total_entries}.')
     return temp, err_perc
 
@@ -100,26 +99,26 @@ def genf(file_content):
         yield i
 
 
-#считаем статистику
+# считаем статистику
 def counter(d: dict, limit):
     result = []
-    for k,v in d.items():
+    for k, v in d.items():
         if k not in ['total_count', 'total_request_time']:
             result.append({
-                "url":k,
-                "count":len(v),
-                "count_perc":round(len(v)/d['total_count']*100,3),
-                "time_sum":sum(v),
-                "time_perc":round(sum(v)/d['total_request_time']*100,3),
-                "time_avg":sum(v)/len(v),
-                "time_max":max(v),
-                "time_med":median(v),
+                "url": k,
+                "count": len(v),
+                "count_perc": round(len(v) / d['total_count'] * 100, 3),
+                "time_sum": sum(v),
+                "time_perc": round(sum(v) / d['total_request_time'] * 100, 3),
+                "time_avg": sum(v) / len(v),
+                "time_max": max(v),
+                "time_med": median(v),
             })
     result = sorted(result, key=lambda x: x['time_sum'], reverse=True)
     return result[:limit]
 
 
-#функция создатель отчета
+# функция создатель отчета
 def render_report(stats, path, file_date):
     try:
         with open('report.html', 'r') as f:
@@ -133,6 +132,7 @@ def render_report(stats, path, file_date):
         logger.error(f'{e}')
         raise
 
+
 def run(config):
     try:
         logger.info('start work with logs')
@@ -140,14 +140,14 @@ def run(config):
         if last_logfile is not None:
             logger.info(f'working with {last_logfile.name}')
             path = os.path.join(last_logfile.path, last_logfile.name)
-            read_cmd = "gzip.open(path, 'rb')" if last_logfile.is_gz else "open(path, 'rb')" # тернарный оператор
+            read_cmd = "gzip.open(path, 'rb')" if last_logfile.is_gz else "open(path, 'rb')"  # тернарный оператор
             logger.info(f'reading logfile')
             with eval(read_cmd) as f:
                 lfile = f.read()
             generator = genf(lfile)
             logger.info(f'parsing logfile')
             parse_data, err_perc = parser(generator)
-            logger.info(f'Не удалось распарсить {round(err_perc,2)}% логов')
+            logger.info(f'Не удалось распарсить {round(err_perc, 2)}% логов')
             if err_perc > 30:
                 logger.error(f'Превышен 30% допустимых ошибок при парсинге.')
             logger.info(f'counting stats')
@@ -191,5 +191,3 @@ def main(config):
 if __name__ == "__main__":
     main(config)
 
-
-# tests, monitoring (logging?)

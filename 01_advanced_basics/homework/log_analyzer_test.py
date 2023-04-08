@@ -1,8 +1,9 @@
-from unittest import TestCase, main
-import log_analyzer
-from collections import namedtuple
 from datetime import datetime
-# print()
+from unittest import TestCase, main
+
+import log_analyzer
+
+
 class AnalyzerTest(TestCase):
     def test_base_config(self):
         self.assertIsNotNone(log_analyzer.config)
@@ -34,7 +35,6 @@ class AnalyzerTest(TestCase):
             'ui',
             log_file.name,
         )
-        
 
 
 if __name__ == '__main__':
