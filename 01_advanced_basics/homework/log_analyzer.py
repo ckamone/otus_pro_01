@@ -12,6 +12,7 @@ import json
 import logging
 import os
 import re
+import gzip
 from collections import namedtuple
 from datetime import datetime
 from statistics import median
@@ -133,8 +134,16 @@ def render_report(stats, path, file_date):
         raise
 
 
+def checkin_dir(directory):
+    if not os.path.exists(directory):
+        raise NotADirectoryError(
+            f"Нужна директория: mkdir {directory}")
+
+
 def run(config):
     try:
+        checkin_dir(config['LOG_DIR'])
+        checkin_dir(config['REPORT_DIR'])
         logger.info('start work with logs')
         last_logfile = get_last_logfile(config['LOG_DIR'])
         if last_logfile is not None:
@@ -190,4 +199,3 @@ def main(config):
 
 if __name__ == "__main__":
     main(config)
-
