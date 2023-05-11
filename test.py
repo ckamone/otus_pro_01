@@ -1,4 +1,4 @@
 """Module providingFunction printing python version."""
-import sys
+import random
 
-print('hello world')
+print(random.randint(0,2)
