@@ -45,6 +45,7 @@ if config.get('LOG_FILE', False):
     logger.addHandler(file_handler)
 
 
+# проверка формата
 def check_format(a):
     return True if re.findall(r'[\.0-9][g0-9][z0-9]$',a) else False
 
