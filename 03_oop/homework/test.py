@@ -1,48 +1,68 @@
-import hashlib
+"""Test module"""
 import datetime
 import functools
+import hashlib
 import unittest
 
 import api
 
 
 def cases(cases):
-    def decorator(f):
-        @functools.wraps(f)
+    """Декоратор для запуска тесткейса с несколькими параметрами"""
+    def decorator(func):
+        @functools.wraps(func)
         def wrapper(*args):
-            for c in cases:
-                new_args = args + (c if isinstance(c, tuple) else (c,))
-                f(*new_args)
+            for case in cases:
+                new_args = args + (case if isinstance(case, tuple) else (case,))
+                func(*new_args)
+
         return wrapper
+
     return decorator
 
 
 class TestSuite(unittest.TestCase):
+    """Класс с тестами"""
     def setUp(self):
+        """Настройка перед тестами"""
         self.context = {}
         self.headers = {}
         self.settings = {}
 
     def get_response(self, request):
-        return api.method_handler({"body": request, "headers": self.headers}, self.context, self.settings)
+        """получаем респонс"""
+        return api.method_handler(
+            {"body": request, "headers": self.headers},
+            self.context,
+            self.settings
+            )
 
     def set_valid_auth(self, request):
+        """Генерим токен"""
         if request.get("login") == api.ADMIN_LOGIN:
-            request["token"] = hashlib.sha512((datetime.datetime.now().strftime("%Y%m%d%H") + api.ADMIN_SALT).encode('utf-8')).hexdigest()
+            request["token"] = hashlib.sha512(
+                (
+                datetime.datetime.now().strftime("%Y%m%d%H") + api.ADMIN_SALT
+                ).encode('utf-8')).hexdigest()
         else:
             msg = request.get("account", "") + request.get("login", "") + api.SALT
             request["token"] = hashlib.sha512(msg.encode('utf-8')).hexdigest()
 
     def test_empty_request(self):
+        """Проверка на пустой запрос"""
         _, code = self.get_response({})
         self.assertEqual(api.INVALID_REQUEST, code)
 
     @cases([
-        {"account": "horns&hoofs", "login": "h&f", "method": "online_score", "token": "", "arguments": {}},
-        {"account": "horns&hoofs", "login": "h&f", "method": "online_score", "token": "sdd", "arguments": {}},
-        {"account": "horns&hoofs", "login": "admin", "method": "online_score", "token": "", "arguments": {}},
+        {"account": "horns&hoofs", "login": "h&f",
+         "method": "online_score", "token": "", "arguments": {}},
+        {"account": "horns&hoofs", "login": "h&f",
+         "method": "online_score", "token": "sdd", "arguments": {}},
+        {"account": "horns&hoofs", "login": "admin",
+         "method": "online_score", "token": "", "arguments": {}},
     ])
     def test_bad_auth(self, request):
+        """Проверка с неправильной аутентификацией"""
         _, code = self.get_response(request)
         self.assertEqual(api.FORBIDDEN, code)
 
@@ -52,6 +72,7 @@ class TestSuite(unittest.TestCase):
         {"account": "horns&hoofs", "method": "online_score", "arguments": {}},
     ])
     def test_invalid_method_request(self, request):
+        """Проверка с неправильным запросом method_request"""
         self.set_valid_auth(request)
         response, code = self.get_response(request)
         self.assertEqual(api.INVALID_REQUEST, code)
@@ -64,16 +85,21 @@ class TestSuite(unittest.TestCase):
         {"phone": "79175002040", "email": "stupnikovotus.ru"},
         {"phone": "79175002040", "email": "stupnikov@otus.ru", "gender": -1},
         {"phone": "79175002040", "email": "stupnikov@otus.ru", "gender": "1"},
-        {"phone": "79175002040", "email": "stupnikov@otus.ru", "gender": 1, "birthday": "01.01.1890"},
+        {"phone": "79175002040", "email": "stupnikov@otus.ru",
+         "gender": 1, "birthday": "01.01.1890"},
         {"phone": "79175002040", "email": "stupnikov@otus.ru", "gender": 1, "birthday": "XXX"},
-        {"phone": "79175002040", "email": "stupnikov@otus.ru", "gender": 1, "birthday": "01.01.2000", "first_name": 1},
-        {"phone": "79175002040", "email": "stupnikov@otus.ru", "gender": 1, "birthday": "01.01.2000",
+        {"phone": "79175002040", "email": "stupnikov@otus.ru",
+         "gender": 1, "birthday": "01.01.2000", "first_name": 1},
+        {"phone": "79175002040", "email": "stupnikov@otus.ru",
+         "gender": 1, "birthday": "01.01.2000",
          "first_name": "s", "last_name": 2},
         {"phone": "79175002040", "birthday": "01.01.2000", "first_name": "s"},
         {"email": "stupnikov@otus.ru", "gender": 1, "last_name": 2},
     ])
     def test_invalid_score_request(self, arguments):
-        request = {"account": "horns&hoofs", "login": "h&f", "method": "online_score", "arguments": arguments}
+        """test_invalid_score_request"""
+        request = {"account": "horns&hoofs", "login": "h&f",
+                   "method": "online_score", "arguments": arguments}
         self.set_valid_auth(request)
         response, code = self.get_response(request)
         self.assertEqual(api.INVALID_REQUEST, code, arguments)
@@ -86,11 +112,14 @@ class TestSuite(unittest.TestCase):
         {"gender": 0, "birthday": "01.01.2000"},
         {"gender": 2, "birthday": "01.01.2000"},
         {"first_name": "a", "last_name": "b"},
-        {"phone": "79175002040", "email": "stupnikov@otus.ru", "gender": 1, "birthday": "01.01.2000",
+        {"phone": "79175002040", "email": "stupnikov@otus.ru",
+         "gender": 1, "birthday": "01.01.2000",
          "first_name": "a", "last_name": "b"},
     ])
     def test_ok_score_request(self, arguments):
-        request = {"account": "horns&hoofs", "login": "h&f", "method": "online_score", "arguments": arguments}
+        """test_ok_score_request"""
+        request = {"account": "horns&hoofs", "login": "h&f",
+                   "method": "online_score", "arguments": arguments}
         self.set_valid_auth(request)
         response, code = self.get_response(request)
         self.assertEqual(api.OK, code, arguments)
@@ -99,8 +128,10 @@ class TestSuite(unittest.TestCase):
         self.assertEqual(sorted(self.context["has"]), sorted(arguments.keys()))
 
     def test_ok_score_admin_request(self):
+        """test_ok_score_admin_request"""
         arguments = {"phone": "79175002040", "email": "stupnikov@otus.ru"}
-        request = {"account": "horns&hoofs", "login": "admin", "method": "online_score", "arguments": arguments}
+        request = {"account": "horns&hoofs", "login": "admin",
+                   "method": "online_score", "arguments": arguments}
         self.set_valid_auth(request)
         response, code = self.get_response(request)
         self.assertEqual(api.OK, code)
@@ -116,7 +147,11 @@ class TestSuite(unittest.TestCase):
         {"client_ids": [1, 2], "date": "XXX"},
     ])
     def test_invalid_interests_request(self, arguments):
-        request = {"account": "horns&hoofs", "login": "h&f", "method": "clients_interests", "arguments": arguments}
+        """test_invalid_interests_request"""
+        request = {"account": "horns&hoofs",
+                   "login": "h&f", 
+                   "method": "clients_interests", 
+                   "arguments": arguments}
         self.set_valid_auth(request)
         response, code = self.get_response(request)
         self.assertEqual(api.INVALID_REQUEST, code, arguments)
@@ -128,13 +163,19 @@ class TestSuite(unittest.TestCase):
         {"client_ids": [0]},
     ])
     def test_ok_interests_request(self, arguments):
-        request = {"account": "horns&hoofs", "login": "h&f", "method": "clients_interests", "arguments": arguments}
+        """test_ok_interests_request"""
+        request = {"account": "horns&hoofs",
+                   "login": "h&f", 
+                   "method": "clients_interests", 
+                   "arguments": arguments}
         self.set_valid_auth(request)
         response, code = self.get_response(request)
         self.assertEqual(api.OK, code, arguments)
         self.assertEqual(len(arguments["client_ids"]), len(response))
-        self.assertTrue(all(v and isinstance(v, list) and all(isinstance(i, (bytes, str)) for i in v)
-                        for v in response.values()))
+        self.assertTrue(all(
+            v and isinstance(v, list) and all(isinstance(i, (bytes, str)) for i in v)
+                            for v in response.values()
+                            ))
         self.assertEqual(self.context.get("nclients"), len(arguments["client_ids"]))
 
 
