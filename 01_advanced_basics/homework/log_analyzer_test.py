@@ -1,3 +1,4 @@
+"""Module for testing log_analyzer"""
 from datetime import datetime
 from unittest import TestCase, main
 
@@ -5,7 +6,9 @@ import log_analyzer
 
 
 class AnalyzerTest(TestCase):
+    """Analyzer test"""
     def test_base_config(self):
+        """config testing"""
         self.assertIsNotNone(log_analyzer.config)
         self.assertIsInstance(log_analyzer.config, dict)
 
@@ -17,6 +20,7 @@ class AnalyzerTest(TestCase):
         self.assertGreater(log_analyzer.config.get('REPORT_SIZE'), 0)
 
     def test_get_last_logfile(self):
+        """logfile testing"""
         log_file = log_analyzer.get_last_logfile(log_analyzer.config.get('LOG_DIR'))
         print(log_file)
         self.assertIsInstance(
