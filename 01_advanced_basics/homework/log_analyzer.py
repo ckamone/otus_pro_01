@@ -17,6 +17,7 @@ import re
 from collections import namedtuple
 from datetime import datetime
 from statistics import median
+from ast import literal_eval
 
 config = {
     "REPORT_SIZE": 1000,
@@ -176,7 +177,7 @@ def run(configuration):
                 _ = os.path.join(last_logfile.path, last_logfile.name)
                 read_cmd = "gzip.open(path, 'rb')" if last_logfile.is_gz else "open(path, 'rb')"
                 logger.info('reading logfile')
-                with eval(read_cmd) as file:
+                with literal_eval(read_cmd) as file:
                     lfile = file.read()
                 generator = genf(lfile)
                 logger.info('parsing logfile')
