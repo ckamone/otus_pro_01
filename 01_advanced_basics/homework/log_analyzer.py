@@ -1,18 +1,19 @@
+"""This module does blah blah."""
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 
-# log_format ui_short '$remote_addr  $remote_user $http_x_real_ip [$time_local] "$request" '
-#                     '$status $body_bytes_sent "$http_referer" '
-#                     '"$http_user_agent" "$http_x_forwarded_for" "$http_X_REQUEST_ID" "$http_X_RB_USER" '  
-#                     '$request_time';
+# log_format ui_short
+# '$remote_addr  $remote_user $http_x_real_ip [$time_local] "$request" '
+# '$status $body_bytes_sent "$http_referer" '
+# '"$http_user_agent" "$http_x_forwarded_for" "$http_X_REQUEST_ID" "$http_X_RB_USER" '
+# '$request_time';
 
 import argparse
 import json
 import logging
 import os
 import re
-import gzip
 from collections import namedtuple
 from datetime import datetime
 from statistics import median
@@ -45,36 +46,33 @@ if config.get('LOG_FILE', False):
     logger.addHandler(file_handler)
 
 
-# проверка формата
-def check_format(a):
-    return True if re.findall(r'[\.0-9][g0-9][z0-9]$',a) else False
+def check_format(string):
+    """проверка формата"""
+    return bool(re.findall(r'[\.0-9][g0-9][z0-9]$', string))
 
 
-# функция которая ищет последний лог удобно возвращать namedtuple
 def get_last_logfile(mypath):
-    f = []
+    """функция которая ищет последний лог удобно возвращать namedtuple"""
+    temp = []
     for (dirpath, dirnames, filenames) in os.walk(mypath):
         for i in filenames:
             if '-ui.' in i:
-                f.append(i)
+                temp.append(i)
         break
-    if len(f):
-        f.sort()
-        last_log_name = f[-1]
-        if not check_format(last_log_name):
-            logger.error(f'Only support plain text or .gz files')
-            return None
-        Logfile = namedtuple("Logfile", 'path name date is_gz')
-        date = re.findall(r'\d*\.\d+|\d+', last_log_name)
-        date_obj = datetime.strptime(date[0], '%Y%m%d')
-        last_log_obj = Logfile(mypath, last_log_name, date_obj, '.gz' in last_log_name)
-        return last_log_obj
-    else:
-        return None
+    if temp:
+        temp.sort()
+        last_log_name = temp[-1]
+        if check_format(last_log_name):
+            Logfile = namedtuple("Logfile", 'path name date is_gz')
+            date = re.findall(r'\d*\.\d+|\d+', last_log_name)
+            date_obj = datetime.strptime(date[0], '%Y%m%d')
+            last_log_obj = Logfile(mypath, last_log_name, date_obj, '.gz' in last_log_name)
+            return last_log_obj
+        logger.error('Only support plain text or .gz files')
 
 
-# функция парсер лога 
 def parser(gen):
+    """# функция парсер лога"""
     temp = {
         'total_count': 0,
         'total_request_time': 0
@@ -98,68 +96,69 @@ def parser(gen):
         else:
             errors += 1
     err_perc = errors / total_entries * 100
-    logger.info(f'Ошибок при парсинге {errors}, всего записей {total_entries}.')
+    logger.info('Ошибок при парсинге %s, всего записей %s.', errors, total_entries)
     return temp, err_perc
 
 
 def genf(file_content):
+    """Функция генератор"""
     file_content = file_content.decode(encoding='utf-8')
     for i in file_content.split('\n'):
         yield i
 
 
-# считаем статистику
-def counter(d: dict, limit):
+def counter(dictionary: dict, limit):
+    """считаем статистику"""
     result = []
-    for k, v in d.items():
-        if k not in ['total_count', 'total_request_time']:
+    for key, val in dictionary.items():
+        if key not in ['total_count', 'total_request_time']:
             result.append({
-                "url": k,
-                "count": len(v),
-                "count_perc": round(len(v) / d['total_count'] * 100, 3),
-                "time_sum": sum(v),
-                "time_perc": round(sum(v) / d['total_request_time'] * 100, 3),
-                "time_avg": sum(v) / len(v),
-                "time_max": max(v),
-                "time_med": median(v),
+                "url": key,
+                "count": len(val),
+                "count_perc": round(len(val) / dictionary['total_count'] * 100, 3),
+                "time_sum": sum(val),
+                "time_perc": round(sum(val) / dictionary['total_request_time'] * 100, 3),
+                "time_avg": sum(val) / len(val),
+                "time_max": max(val),
+                "time_med": median(val),
             })
     result = sorted(result, key=lambda x: x['time_sum'], reverse=True)
     return result[:limit]
 
 
-# функция создатель отчета
 def render_report(stats, rep_name):
+    """функция создатель отчета"""
     try:
-        with open('report.html', 'r') as f:
-            text = f.read()
+        with open('report.html', 'r', encoding='utf-8') as file:
+            text = file.read()
 
         text = text.replace('$table_json', str(stats))
         # rep_name = os.path.join(path, f'report-{file_date.strftime("%Y.%m.%d")}.html')
-        with open(rep_name, 'w') as f:
-            f.write(text)
-    except (FileNotFoundError, json.decoder.JSONDecodeError) as e:
-        logger.error(f'{e}')
+        with open(rep_name, 'w', encoding='utf-8') as file:
+            file.write(text)
+    except (FileNotFoundError, json.decoder.JSONDecodeError) as error:
+        logger.error('%s', error)
         raise
 
 
 def checkin_dir(directory):
+    """проверка что папка существует"""
     if not os.path.exists(directory):
         raise NotADirectoryError(
             f"Нужна директория: mkdir {directory}")
 
 
-# функция проверяет что скрипт не отрабатывал с этим лог файлом
 def check_repeat(rep, repdir):
-    f = []
+    """функция проверяет что скрипт не отрабатывал с этим лог файлом"""
+    temp = []
     for (dirpath, dirnames, filenames) in os.walk(repdir):
-        f = filenames
+        temp = filenames
         break
-    return True if rep in f else False
-    
-
+    return rep in temp
 
 
 def run(config):
+    """Run log analyzer"""
     try:
         checkin_dir(config['LOG_DIR'])
         checkin_dir(config['REPORT_DIR'])
@@ -172,31 +171,32 @@ def run(config):
             else:
                 rep_name = os.path.join(config['REPORT_DIR'], rep_name)
 
-                logger.info(f'working with {last_logfile.name}')
+                logger.info('working with %s', last_logfile.name)
                 path = os.path.join(last_logfile.path, last_logfile.name)
-                read_cmd = "gzip.open(path, 'rb')" if last_logfile.is_gz else "open(path, 'rb')"  # тернарный оператор
-                logger.info(f'reading logfile')
-                with eval(read_cmd) as f:
-                    lfile = f.read()
+                read_cmd = "gzip.open(path, 'rb')" if last_logfile.is_gz else "open(path, 'rb')"
+                logger.info('reading logfile')
+                with eval(read_cmd) as file:
+                    lfile = file.read()
                 generator = genf(lfile)
-                logger.info(f'parsing logfile')
+                logger.info('parsing logfile')
                 parse_data, err_perc = parser(generator)
-                logger.info(f'Не удалось распарсить {round(err_perc, 2)}% логов')
+                logger.info('Не удалось распарсить %s процента логов', round(err_perc, 2))
                 if err_perc > 30:
-                    logger.error(f'Превышен 30% допустимых ошибок при парсинге.')
-                logger.info(f'counting stats')
+                    logger.error('Превышен 30% допустимых ошибок при парсинге.')
+                logger.info('counting stats')
                 stats = counter(parse_data, config['REPORT_SIZE'])
-                logger.info(f'rendering report')
+                logger.info('rendering report')
                 render_report(stats, rep_name)
         else:
             logger.error('no log files to analyze')
         logger.info('script done')
-    except (Exception, KeyboardInterrupt) as e:
-        logger.exception(f'{e}')
+    except (Exception, KeyboardInterrupt) as error:
+        logger.exception('%s', error)
         raise
 
 
 def main(config):
+    """The main func"""
     logger.info('start script')
 
     parser = argparse.ArgumentParser()
@@ -208,14 +208,14 @@ def main(config):
     args = parser.parse_args()
     if args.config is not config:
         try:
-            logger.info(f'using {args.config} as cfg file')
-            with open(args.config, 'r') as f:
-                config = json.loads(f.read())
-        except (FileNotFoundError, json.decoder.JSONDecodeError) as e:
-            logger.error(f'{e}')
+            logger.info('using %s as cfg file', args.config)
+            with open(args.config, 'r', encoding='utf-8') as file:
+                config = json.loads(file.read())
+        except (FileNotFoundError, json.decoder.JSONDecodeError) as error:
+            logger.error('%s', error)
             raise
-        except Exception as e:
-            logger.exception(f'{e}')
+        except Exception as error:
+            logger.exception('%s', error)
             raise
     else:
         logger.info('using default cfg')
