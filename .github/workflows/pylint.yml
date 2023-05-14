@@ -21,4 +21,5 @@ jobs:
     - name: Analysing the code with pylint
       run: |
         pylint $(git ls-files '*.py')
-        python3 ./01_advanced_basics/homework/log_analyzer_test.py
+        cd ./01_advanced_basics/homework/
+        python3 log_analyzer_test.py
