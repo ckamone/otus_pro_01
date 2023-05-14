@@ -69,6 +69,7 @@ def get_last_logfile(mypath):
             last_log_obj = Logfile(mypath, last_log_name, date_obj, '.gz' in last_log_name)
             return last_log_obj
         logger.error('Only support plain text or .gz files')
+    return None
 
 
 def parser(gen):
@@ -157,19 +158,19 @@ def check_repeat(rep, repdir):
     return rep in temp
 
 
-def run(config):
+def run(configuration):
     """Run log analyzer"""
     try:
-        checkin_dir(config['LOG_DIR'])
-        checkin_dir(config['REPORT_DIR'])
+        checkin_dir(configuration['LOG_DIR'])
+        checkin_dir(configuration['REPORT_DIR'])
         logger.info('start work with logs')
-        last_logfile = get_last_logfile(config['LOG_DIR'])
+        last_logfile = get_last_logfile(configuration['LOG_DIR'])
         if last_logfile is not None:
             rep_name = f'report-{last_logfile.date.strftime("%Y.%m.%d")}.html'
-            if check_repeat(rep_name, config['REPORT_DIR']):
+            if check_repeat(rep_name, configuration['REPORT_DIR']):
                 logger.info('report done already')
             else:
-                rep_name = os.path.join(config['REPORT_DIR'], rep_name)
+                rep_name = os.path.join(configuration['REPORT_DIR'], rep_name)
 
                 logger.info('working with %s', last_logfile.name)
                 _ = os.path.join(last_logfile.path, last_logfile.name)
@@ -195,22 +196,22 @@ def run(config):
         raise
 
 
-def main(config):
+def main(configuration):
     """The main func"""
     logger.info('start script')
 
-    parser = argparse.ArgumentParser()
+    parser_var = argparse.ArgumentParser()
 
-    parser.add_argument('--config',
-                        default=config,
+    parser_var.add_argument('--config',
+                        default=configuration,
                         help="set configuration file path")
 
-    args = parser.parse_args()
-    if args.config is not config:
+    args = parser_var.parse_args()
+    if args.config is not configuration:
         try:
             logger.info('using %s as cfg file', args.config)
             with open(args.config, 'r', encoding='utf-8') as file:
-                config = json.loads(file.read())
+                configuration = json.loads(file.read())
         except (FileNotFoundError, json.decoder.JSONDecodeError) as error:
             logger.error('%s', error)
             raise
@@ -219,7 +220,7 @@ def main(config):
             raise
     else:
         logger.info('using default cfg')
-    run(config)
+    run(configuration)
 
 
 if __name__ == "__main__":
