@@ -54,7 +54,7 @@ def check_format(string):
 def get_last_logfile(mypath):
     """функция которая ищет последний лог удобно возвращать namedtuple"""
     temp = []
-    for (dirpath, dirnames, filenames) in os.walk(mypath):
+    for (_, _, filenames) in os.walk(mypath):
         for i in filenames:
             if '-ui.' in i:
                 temp.append(i)
@@ -151,7 +151,7 @@ def checkin_dir(directory):
 def check_repeat(rep, repdir):
     """функция проверяет что скрипт не отрабатывал с этим лог файлом"""
     temp = []
-    for (dirpath, dirnames, filenames) in os.walk(repdir):
+    for (_, _, filenames) in os.walk(repdir):
         temp = filenames
         break
     return rep in temp
@@ -172,7 +172,7 @@ def run(config):
                 rep_name = os.path.join(config['REPORT_DIR'], rep_name)
 
                 logger.info('working with %s', last_logfile.name)
-                path = os.path.join(last_logfile.path, last_logfile.name)
+                _ = os.path.join(last_logfile.path, last_logfile.name)
                 read_cmd = "gzip.open(path, 'rb')" if last_logfile.is_gz else "open(path, 'rb')"
                 logger.info('reading logfile')
                 with eval(read_cmd) as file:
